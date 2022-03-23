@@ -1,4 +1,4 @@
-import {Layout, Divider, Typography} from "antd"
+import { Divider, Layout, Typography } from "antd"
 import React, { FC } from "react"
 
 const { Footer } = Layout
@@ -9,7 +9,8 @@ export const AppFooter: FC = () => {
 		<Footer>
 			<Divider />
 			<Text type="secondary">
-				Agent-Based Manufacturing Living Lab - EPSRC Brokering Additive Manufacturing Project - Design Manufacturing Futures Lab
+				Agent-Based Manufacturing Living Lab - EPSRC Brokering Additive
+				Manufacturing Project - Design Manufacturing Futures Lab
 			</Text>
 		</Footer>
 	)
