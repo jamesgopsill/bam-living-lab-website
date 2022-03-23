@@ -1,0 +1,15 @@
+@import "../node_modules/antd/dist/antd.css";
+
+.ant-layout {
+	background-color: white;
+}
+
+.ant-layout-footer {
+	background-color: white;
+}
+
+.ant-layout-content {
+	background-color: white;
+	margin-left: 20px;
+	margin-right: 20px;
+}
