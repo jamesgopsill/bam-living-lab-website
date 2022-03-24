@@ -61,6 +61,12 @@ export interface MachineAgentProps {
 export enum MachineSocketStates {
 	CONNECTED = "connected",
 	DISCONNECTED = "disconnected",
+	SEARCHING = "searching",
+}
+
+export enum JobSocketStates {
+	CONNECTED = "connected",
+	DISCONNECTED = "disconnected",
 }
 
 export interface BamStats {

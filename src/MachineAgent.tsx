@@ -1,4 +1,4 @@
-import { Button, Descriptions, Input, notification, Space } from "antd"
+import { Button, Descriptions, Input, notification, Space, Tag } from "antd"
 import React, { FC, Fragment, useEffect, useRef, useState } from "react"
 import { io, Socket } from "socket.io-client"
 import {
@@ -13,32 +13,46 @@ import {
 import { useInterval } from "./utils/use-interval"
 
 export const MachineAgent: FC<MachineAgentProps> = (props) => {
+	// Form vars
+	const [key, setKey] = useState<string>("")
+	const [group, setGroup] = useState<string>("")
+	const [connectBtnDisabled, setConnectBtnDisabled] = useState<boolean>(false)
+	// Socket vars
 	const [socketState, setSocketState] = useState<MachineSocketStates>(
 		MachineSocketStates.DISCONNECTED
 	)
 	const [socket, setSocket] = useState<Socket | null>(null)
-	const [connectBtnDisabled, setConnectBtnDisabled] = useState<boolean>(false)
-	const [key, setKey] = useState<string>("socket-key")
-	const [group, setGroup] = useState<string>("test-group")
 	const [statsInterval, setStatsInterval] = useState<number | null>(null)
 	const [stats, setStats] = useState<BamStats>({
 		activeJobs: 0,
 		activeMachines: 0,
 	})
 	const [searchInterval, setSearchInterval] = useState<number | null>(null) // Must be greater than the returns interval
+	const [jobs, setJobs] = useState<Message[]>([])
+	const jobsRef = useRef(jobs)
+	jobsRef.current = jobs
 
 	const searchWait = 4000
 	const repliesWait = 2000
 	const statsWait = 1000
 
-	const jobs = useRef<Message[]>([])
-
 	useEffect(() => {
-		// This should occur when the printer becomes available again for more jobs.
-		if (props.machineState == MachineStates.AVAILABLE) {
+		if (
+			props.machineState == MachineStates.AVAILABLE &&
+			socketState == MachineSocketStates.CONNECTED
+		) {
 			setSearchInterval(searchWait)
+		} else {
+			setSearchInterval(null)
 		}
-	}, [props.machineState])
+		if (socketState != MachineSocketStates.DISCONNECTED) {
+			setStatsInterval(searchWait)
+			setConnectBtnDisabled(true)
+		} else {
+			setStatsInterval(null)
+			setConnectBtnDisabled(false)
+		}
+	}, [props.machineState, socketState])
 
 	useInterval(() => {
 		if (socket) {
@@ -65,8 +79,8 @@ export const MachineAgent: FC<MachineAgentProps> = (props) => {
 
 	const selectJob = () => {
 		// Pick the first job from the list
-		if (jobs.current.length > 0) {
-			const job = jobs.current[0]
+		if (jobsRef.current.length > 0) {
+			const job = jobsRef.current[0]
 			const msg: Message = {
 				fromId: socket.id,
 				toId: job.fromId,
@@ -78,7 +92,7 @@ export const MachineAgent: FC<MachineAgentProps> = (props) => {
 	}
 
 	const connect = () => {
-		console.log(`Access Key: ${key} | Group: ${group}`)
+		console.log(`|- MachineAgnet: Access Key: ${key} | Group: ${group}`)
 		if (key == "") {
 			notification["error"]({
 				message: "No Access Key",
@@ -94,11 +108,9 @@ export const MachineAgent: FC<MachineAgentProps> = (props) => {
 			return
 		}
 
-		setConnectBtnDisabled(true)
+		const url = "https://www.workshop-jobs.com"
 
-		const url = `http://${window.location.hostname}:3000`
-
-		const newSocket = io(url, {
+		const ioConfig = {
 			auth: {
 				token: key,
 			},
@@ -107,51 +119,21 @@ export const MachineAgent: FC<MachineAgentProps> = (props) => {
 				"group-key": group,
 			},
 			path: "/socket/",
-		})
-			.on(MessageProtocols.CONNECT, async () => {
-				console.log(`|- MachineAgent: connected - ${newSocket.id}`)
-				setSocketState(MachineSocketStates.CONNECTED)
-				setSearchInterval(searchWait)
-				setStatsInterval(statsWait)
-			})
+		}
+
+		const s = io(url, ioConfig)
+			.on(MessageProtocols.CONNECT, async () => handleConnect())
 			.on(MessageProtocols.ALL_MACHINES, (msg: Message) => {
 				console.log("|- MachineAgent: Recieved an all machines message")
 			})
-			.on(MessageProtocols.DIRECT, (msg: Message) => {
-				console.log("|- MachineAgent: Recieved a direct message")
-				if (msg.subject == MessageSubject.JOB_IS_AVAILABLE) {
-					jobs.current.push(msg)
-				}
-				if (msg.subject == MessageSubject.JOB_HAS_ACCEPTED_MACHINES_OFFER) {
-					console.log("|- MachineAgent: Passing on the GCode")
-					console.log(msg)
-					jobs.current = []
-					props.setGcode(msg.body.gcode)
-					setSearchInterval(null)
-				}
-				if (msg.subject == MessageSubject.JOB_HAS_DECLINED_MACHINES_OFFER) {
-					jobs.current = []
-					setSearchInterval(searchWait)
-				}
-			})
+			.on(MessageProtocols.DIRECT, (msg: Message) => handleDirectMessage(msg))
 			.on(MessageProtocols.MESSAGE_ERROR, (msg: string) => {
+				console.log("|- MachineAgent: message error")
 				console.log(msg)
 			})
-			.on(MessageProtocols.CONNECT_ERROR, (err) => {
-				console.log("|- MachineAgent: connection error")
-				notification["error"]({
-					message: "Connection Error",
-					description: "Please check your access key",
-				})
-				setConnectBtnDisabled(false)
-				newSocket.close()
-				setSocket(null)
-			})
-			.on(MessageProtocols.STATS, (msg: BamStats) => {
-				// console.log("|- Machine: Got stats")
-				setStats(msg)
-			})
-		setSocket(newSocket)
+			.on(MessageProtocols.CONNECT_ERROR, (err) => handleConnError(s, err))
+			.on(MessageProtocols.STATS, (msg: BamStats) => setStats(msg))
+		setSocket(s)
 	}
 
 	const disconnect = () => {
@@ -159,23 +141,57 @@ export const MachineAgent: FC<MachineAgentProps> = (props) => {
 			socket.close()
 			setSocket(null)
 		}
-		setSearchInterval(null)
-		setStatsInterval(null)
+		setStats({
+			activeJobs: 0,
+			activeMachines: 0,
+		})
+	}
+
+	const handleConnect = () => {
+		console.log(`|- MachineAgent: connected`)
+		setSocketState(MachineSocketStates.CONNECTED)
+	}
+
+	const handleDirectMessage = (msg: Message) => {
+		console.log("|- MachineAgent: Received a direct message")
+		if (msg.subject == MessageSubject.JOB_IS_AVAILABLE) {
+			setJobs((jobs) => [...jobs, msg])
+		}
+		if (msg.subject == MessageSubject.JOB_HAS_ACCEPTED_MACHINES_OFFER) {
+			console.log("|- MachineAgent: Passing on the GCode")
+			setJobs([])
+			props.setGcode(msg.body.gcode)
+		}
+		if (msg.subject == MessageSubject.JOB_HAS_DECLINED_MACHINES_OFFER) {
+			setJobs([])
+		}
+	}
+
+	const handleConnError = (s: Socket, err: string) => {
+		console.log("|- MachineAgent: connection error")
+		notification["error"]({
+			message: "Connection Error",
+			description: "Please check your access key",
+		})
 		setConnectBtnDisabled(false)
+		s.close()
+		setSocket(null)
 	}
 
 	return (
 		<Fragment>
 			<Descriptions title="Machine Agent Status">
 				<Descriptions.Item label="Socket State">
-					{socketState}
+					<Tag color="blue">{socketState}</Tag>
 				</Descriptions.Item>
-				<Descriptions.Item label="Socket Id">{socket?.id}</Descriptions.Item>
+				<Descriptions.Item label="Socket Id">
+					<Tag color="green">{socket?.id}</Tag>
+				</Descriptions.Item>
 				<Descriptions.Item label="# Active Jobs">
-					{stats.activeJobs}
+					<Tag color="green">{stats.activeJobs}</Tag>
 				</Descriptions.Item>
 				<Descriptions.Item label="# Active Machines">
-					{stats.activeMachines}
+					<Tag color="green">{stats.activeMachines}</Tag>
 				</Descriptions.Item>
 			</Descriptions>
 			<Space>

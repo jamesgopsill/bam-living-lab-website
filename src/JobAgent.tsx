@@ -6,13 +6,15 @@ import {
 	Input,
 	notification,
 	Select,
+	Tag,
 	Upload,
 } from "antd"
 import React, { FC, Fragment, useRef, useState } from "react"
-import { io } from "socket.io-client"
+import { io, Socket } from "socket.io-client"
 import {
 	BamStats,
 	JobAgentStates,
+	JobSocketStates,
 	Message,
 	MessageProtocols,
 	MessageSubject,
@@ -23,13 +25,16 @@ const { Option } = Select
 const wait = (ms: number) => new Promise((r, j) => setTimeout(r, ms))
 
 export const JobAgent: FC = () => {
-	const [socketStatus, setSocketStatus] = useState<string>("Disconnected")
+	const [socketState, setSocketState] = useState<JobSocketStates>(
+		JobSocketStates.DISCONNECTED
+	)
 	const [socketId, setSocketId] = useState<string>("")
 
-	const jobState = useRef<JobAgentStates>(JobAgentStates.NOT_ONLINE)
-	const [jobStatus, setJobStatus] = useState<JobAgentStates>(
+	const [jobState, setJobState] = useState<JobAgentStates>(
 		JobAgentStates.NOT_ONLINE
 	)
+	const jobStateRef = useRef(jobState)
+	jobStateRef.current = jobState
 
 	const [fileList, setFileList] = useState<any[]>([])
 	const [disabled, setDisabled] = useState<boolean>(false)
@@ -103,10 +108,11 @@ export const JobAgent: FC = () => {
 	}
 
 	const createJobAgent = (form: any): void => {
-		jobState.current = JobAgentStates.AVAILABLE
-		setJobStatus(JobAgentStates.AVAILABLE)
-		const url = `http://${window.location.hostname}:3000`
-		const socket = io(url, {
+		setJobState(JobAgentStates.AVAILABLE)
+
+		const url = "https://www.workshop-jobs.com"
+
+		const ioConfig = {
 			auth: {
 				token: form.key,
 			},
@@ -115,110 +121,125 @@ export const JobAgent: FC = () => {
 				"group-key": form.group,
 			},
 			path: "/socket/",
-		})
-			.on(MessageProtocols.CONNECT, async () => {
-				console.log(`|- Job connected: ${socket.id}`)
-				setSocketStatus("Connected")
-				setSocketId(socket.id)
-				socket.emit(MessageProtocols.STATS)
+		}
+		const socket = io(url, ioConfig)
+			.on(MessageProtocols.CONNECT, () => handleConnect(socket, form.timeout))
+			.on(MessageProtocols.ALL_JOBS, (msg: Message) =>
+				handleAllJobs(socket, msg)
+			)
+			.on(MessageProtocols.DIRECT, async (msg: any) =>
+				handleDirect(socket, msg)
+			)
+			.on(MessageProtocols.MESSAGE_ERROR, (msg: string) => console.log(msg))
+			.on(MessageProtocols.CONNECT_ERROR, (err: string) =>
+				handleConnError(socket, err)
+			)
+			.on(MessageProtocols.STATS, (msg: BamStats) => setStats(msg))
+	}
 
-				// Set a timeout (just to catch anything)
-				await wait(form.timeout * 1000)
+	const handleConnect = async (
+		socket: Socket,
+		timeout: number
+	): Promise<void> => {
+		console.log(`|- Job connected: ${socket.id}`)
+		setSocketState(JobSocketStates.CONNECTED)
+		setSocketId(socket.id)
+		socket.emit(MessageProtocols.STATS)
 
-				console.log(jobState.current)
-				setSocketStatus("Disconnected")
-				setSocketId("")
-				setDisabled(false)
-				if (jobState.current != JobAgentStates.SELECTED) {
-					notification["warning"]({
-						message: "Timeout",
-						description: "Your connection timed out",
-					})
-					jobState.current = JobAgentStates.NOT_ONLINE
-					setJobStatus(JobAgentStates.NOT_ONLINE)
-				}
-				socket.close()
+		// Set a timeout (just to catch anything)
+		await wait(timeout * 1000)
+
+		console.log(`|- JobAgent: Reached timout with state ${jobStateRef.current}`)
+		setSocketState(JobSocketStates.DISCONNECTED)
+		setSocketId("")
+		setDisabled(false)
+		if (jobStateRef.current != JobAgentStates.SELECTED) {
+			notification["warning"]({
+				message: "Timeout",
+				description: "Your connection timed out",
 			})
-			.on(MessageProtocols.ALL_JOBS, (msg: Message) => {
-				console.log(msg)
-				// Respond to the machine
-				if (
-					msg.subject == MessageSubject.MACHINE_IS_LOOKING_FOR_JOBS &&
-					jobState.current == JobAgentStates.AVAILABLE
-				) {
-					const response: Message = {
-						toId: msg.fromId,
-						fromId: socket.id,
-						subject: MessageSubject.JOB_IS_AVAILABLE,
-						body: {},
-					}
-					socket.emit(MessageProtocols.DIRECT, response)
-					return
-				}
+			setJobState(JobAgentStates.NOT_ONLINE)
+		}
+		socket.close()
+	}
+
+	const handleAllJobs = (socket: Socket, msg: Message): void => {
+		console.log("|- JobAgent: received ALL_JOBS message")
+		console.log(`|- JobAgent: status - ${jobStateRef.current}`)
+		// Respond to the machine
+		if (
+			msg.subject == MessageSubject.MACHINE_IS_LOOKING_FOR_JOBS &&
+			jobStateRef.current == JobAgentStates.AVAILABLE
+		) {
+			const response: Message = {
+				toId: msg.fromId,
+				fromId: socket.id,
+				subject: MessageSubject.JOB_IS_AVAILABLE,
+				body: {},
+			}
+			socket.emit(MessageProtocols.DIRECT, response)
+		}
+	}
+
+	const handleDirect = async (socket: Socket, msg: Message): Promise<void> => {
+		console.log("|- Job received DIRECT message")
+		if (
+			msg.subject == MessageSubject.MACHINE_HAS_CHOSEN_A_JOB &&
+			jobStateRef.current == JobAgentStates.AVAILABLE
+		) {
+			console.log("|- Job responding with accept")
+			const response: Message = {
+				toId: msg.fromId,
+				fromId: socket.id,
+				subject: MessageSubject.JOB_HAS_ACCEPTED_MACHINES_OFFER,
+				body: {
+					gcode: await fileList[0].text(),
+				},
+			}
+			socket.emit(MessageProtocols.DIRECT, response)
+			setJobState(JobAgentStates.SELECTED)
+			notification["success"]({
+				message: "Job Accepted",
+				description: "A machine has accepted your job",
 			})
-			.on(MessageProtocols.DIRECT, async (msg: any) => {
-				console.log("|- Job received DIRECT message")
-				if (
-					msg.subject == MessageSubject.MACHINE_HAS_CHOSEN_A_JOB &&
-					jobState.current == JobAgentStates.AVAILABLE
-				) {
-					console.log("|- Job responding with accept")
-					const response: Message = {
-						toId: msg.fromId,
-						fromId: socket.id,
-						subject: MessageSubject.JOB_HAS_ACCEPTED_MACHINES_OFFER,
-						body: {
-							gcode: await fileList[0].text(),
-						},
-					}
-					socket.emit(MessageProtocols.DIRECT, response)
-					jobState.current = JobAgentStates.SELECTED
-					setJobStatus(JobAgentStates.SELECTED)
-					notification["success"]({
-						message: "Job Accepted",
-						description: "A machine has accepted your job",
-					})
-					return
-				}
-				if (msg.subject == MessageSubject.MACHINE_HAS_CHOSEN_A_JOB) {
-					console.log("|- Job responding with decline")
-					const response: Message = {
-						toId: msg.fromId,
-						fromId: socket.id,
-						subject: MessageSubject.JOB_HAS_DECLINED_MACHINES_OFFER,
-						body: {},
-					}
-					socket.emit(MessageProtocols.DIRECT, response)
-					return
-				}
-			})
-			.on(MessageProtocols.MESSAGE_ERROR, (msg: string) => {
-				console.log(msg)
-			})
-			.on(MessageProtocols.CONNECT_ERROR, (err) => {
-				console.log("Error")
-				setDisabled(false)
-				socket.close()
-			})
-			.on(MessageProtocols.STATS, (msg: BamStats) => {
-				console.log("Got stats")
-				setStats(msg)
-			})
+			return
+		}
+		if (msg.subject == MessageSubject.MACHINE_HAS_CHOSEN_A_JOB) {
+			console.log("|- Job responding with decline")
+			const response: Message = {
+				toId: msg.fromId,
+				fromId: socket.id,
+				subject: MessageSubject.JOB_HAS_DECLINED_MACHINES_OFFER,
+				body: {},
+			}
+			socket.emit(MessageProtocols.DIRECT, response)
+			return
+		}
+	}
+
+	const handleConnError = (socket: Socket, err: string): void => {
+		console.log(`Connection Error: ${err}`)
+		setDisabled(false)
+		socket.close()
 	}
 
 	return (
 		<Fragment>
 			<Descriptions title="Job Details">
 				<Descriptions.Item label="Connection Status">
-					{socketStatus}
+					<Tag color="blue">{socketState}</Tag>
 				</Descriptions.Item>
-				<Descriptions.Item label="Socket Id">{socketId}</Descriptions.Item>
-				<Descriptions.Item label="Job Status">{jobStatus}</Descriptions.Item>
+				<Descriptions.Item label="Socket Id">
+					<Tag color="red">{socketId}</Tag>
+				</Descriptions.Item>
+				<Descriptions.Item label="Job Status">
+					<Tag color="blue">{jobState}</Tag>
+				</Descriptions.Item>
 				<Descriptions.Item label="# Active Jobs">
-					{stats.activeJobs}
+					<Tag color="green">{stats.activeJobs}</Tag>
 				</Descriptions.Item>
 				<Descriptions.Item label="# Active Machines">
-					{stats.activeMachines}
+					<Tag color="green">{stats.activeMachines}</Tag>
 				</Descriptions.Item>
 			</Descriptions>
 			<Divider />
@@ -227,10 +248,10 @@ export const JobAgent: FC = () => {
 				name="basic"
 				onFinish={onFinish}
 			>
-				<Form.Item label="Access Key" name="key" initialValue="socket-key">
+				<Form.Item label="Access Key" name="key" initialValue="">
 					<Input placeholder="" />
 				</Form.Item>
-				<Form.Item label="Group" name="group" initialValue="test-group">
+				<Form.Item label="Group" name="group" initialValue="">
 					<Input placeholder="" />
 				</Form.Item>
 				<Form.Item
@@ -267,20 +288,3 @@ export const JobAgent: FC = () => {
 		</Fragment>
 	)
 }
-
-/*
-// For marketplace mode
-// For loop repeating the emit if the agent in is the state searching
-for (let i = 0; i < form.timeout; i++) { 
-	if (agentState == JobAgentStates.SEARCHING) {
-		const msg: Message = {
-			toId: "",
-			fromId: socket.id,
-			subject: MessageSubject.JOB_AVAILABLE,
-			body: {}
-		}
-		socket.emit(MessageProtocols.ALL_MACHINES, msg)
-	}
-	await wait(1000)
-}
-*/

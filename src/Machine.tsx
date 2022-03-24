@@ -13,7 +13,6 @@ export const Machine: FC<MachineTabProps> = (props) => {
 	const [gcode, setGcode] = useState<string>("")
 
 	const machine = () => {
-		console.log(props.type)
 		if (props.type == "dummy") {
 			return (
 				<DummyMachine
@@ -25,7 +24,14 @@ export const Machine: FC<MachineTabProps> = (props) => {
 			)
 		}
 		if (props.type == "ultimaker") {
-			return <Ultimaker />
+			return (
+				<Ultimaker
+					machineState={machineState}
+					setMachineState={setMachineState}
+					gcode={gcode}
+					setGcode={setGcode}
+				/>
+			)
 		}
 		if (props.type == "prusa") {
 			return <Prusa />
