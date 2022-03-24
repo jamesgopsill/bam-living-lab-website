@@ -8,8 +8,8 @@
   "scripts": {
     "start": "parcel src/index.html",
     "format": "prettier --write src/**",
-    "pre-add": "yarn format && rm -rf ./build && yarn build",
-    "build": "parcel build --dist-dir build/ --public-url . src/index.html"
+    "pre-add": "yarn format && rm -rf ./docs && yarn build",
+    "build": "parcel build --dist-dir ./docs/ --public-url . src/index.html"
   },
   "devDependencies": {
     "@types/react": "^17.0.41",
