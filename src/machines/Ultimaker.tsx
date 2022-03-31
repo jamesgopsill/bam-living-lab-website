@@ -26,7 +26,7 @@ export const Ultimaker: FC<MachineProps> = (props) => {
 	const [currentJob, setCurrentJob] = useState<UltimakerJobDetails | null>(null)
 
 	useEffect(() => {
-		console.log("|- Machine has received some gcode")
+		console.log("|- Ultimaker: gcode var has updated")
 		if (
 			props.machineState == MachineStates.AVAILABLE &&
 			props.gcode &&

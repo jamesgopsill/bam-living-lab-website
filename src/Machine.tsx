@@ -34,7 +34,14 @@ export const Machine: FC<MachineTabProps> = (props) => {
 			)
 		}
 		if (props.type == "prusa") {
-			return <Prusa />
+			return ( 
+				<Prusa
+					machineState={machineState}
+					setMachineState={setMachineState}
+					gcode={gcode}
+					setGcode={setGcode} 
+				/>
+			)
 		}
 		return
 	}
@@ -48,7 +55,6 @@ export const Machine: FC<MachineTabProps> = (props) => {
 				gcode={gcode}
 				setGcode={setGcode}
 			/>
-			{gcode}
 		</Fragment>
 	)
 }
