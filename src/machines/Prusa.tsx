@@ -1,9 +1,8 @@
-import React, { FC, Fragment, useState, useRef, useEffect } from "react"
+import { Button, Descriptions, Input, notification, Space, Tag } from "antd"
+import React, { FC, Fragment, useEffect, useRef, useState } from "react"
 import { MachineProps, MachineStates } from "../interfaces"
-import { Descriptions, Tag, Input, Button, Space, notification } from "antd"
 
 export const Prusa: FC<MachineProps> = (props) => {
-
 	const [baudRate, setBaudRate] = useState<number>(115200)
 	const [firmware, setFirmware] = useState<string>("")
 	const [uuid, setUUID] = useState<string>("")
@@ -33,7 +32,6 @@ export const Prusa: FC<MachineProps> = (props) => {
 	}, [props.gcode])
 
 	const connect = async () => {
-
 		if (!("serial" in navigator)) {
 			notification["error"]({
 				description: "WebSerial Support",
@@ -232,9 +230,9 @@ export const Prusa: FC<MachineProps> = (props) => {
 
 	const isCanceling = () => {
 		if (cancelPrintFlag) {
-			return  <Tag color="red">canceling print</Tag>
+			return <Tag color="red">canceling print</Tag>
 		}
-		return  <Tag color="green">ready to print</Tag>
+		return <Tag color="green">ready to print</Tag>
 	}
 
 	return (
@@ -249,7 +247,9 @@ export const Prusa: FC<MachineProps> = (props) => {
 				<Descriptions.Item label="Connection">
 					<Tag color="blue">{connection}</Tag>
 				</Descriptions.Item>
-				<Descriptions.Item label="Cancel Print Flag">{isCanceling()}</Descriptions.Item>
+				<Descriptions.Item label="Cancel Print Flag">
+					{isCanceling()}
+				</Descriptions.Item>
 			</Descriptions>
 			<Space>
 				<Input
@@ -268,7 +268,8 @@ export const Prusa: FC<MachineProps> = (props) => {
 				<Button type="primary" onClick={() => setCancelPrintFlag(true)}>
 					Cancel Job
 				</Button>
-				<Button type="default" 
+				<Button
+					type="default"
 					onClick={() => props.setMachineState(MachineStates.AVAILABLE)}
 				>
 					Set as Available

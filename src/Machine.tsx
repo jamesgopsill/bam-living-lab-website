@@ -34,12 +34,12 @@ export const Machine: FC<MachineTabProps> = (props) => {
 			)
 		}
 		if (props.type == "prusa") {
-			return ( 
+			return (
 				<Prusa
 					machineState={machineState}
 					setMachineState={setMachineState}
 					gcode={gcode}
-					setGcode={setGcode} 
+					setGcode={setGcode}
 				/>
 			)
 		}
