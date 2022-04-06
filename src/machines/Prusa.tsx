@@ -1,6 +1,7 @@
 import { Button, Descriptions, Input, notification, Space, Tag } from "antd"
 import React, { FC, Fragment, useEffect, useRef, useState } from "react"
 import { MachineProps, MachineStates } from "../interfaces"
+import { MachineTypeComponent } from "./MachineTypeComponent"
 
 export const Prusa: FC<MachineProps> = (props) => {
 	const [baudRate, setBaudRate] = useState<number>(115200)
@@ -252,6 +253,10 @@ export const Prusa: FC<MachineProps> = (props) => {
 				</Descriptions.Item>
 			</Descriptions>
 			<Space>
+				<MachineTypeComponent
+					machineType={props.machineType}
+					setMachineType={props.setMachineType}
+				/>
 				<Input
 					placeholder="Baud Rate"
 					value={baudRate}

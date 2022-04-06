@@ -54,9 +54,9 @@ export const JobAgent: FC = () => {
 			return Upload.LIST_IGNORE
 		}
 
-		//@ts-ignore
 		if (
 			file.name.indexOf(".gcode.gz") > -1 &&
+			//@ts-ignore
 			typeof DecompressionStream != "function"
 		) {
 			notification["error"]({

@@ -50,10 +50,18 @@ export interface MachineProps {
 	setMachineState: any
 	gcode: string
 	setGcode: any
+	machineType: MachineTypes
+	setMachineType: any
+}
+
+export interface MachineTypeComponentProps {
+	machineType: MachineTypes
+	setMachineType: any
 }
 
 export interface MachineAgentProps {
 	machineState: MachineStates
+	machineType: MachineTypes
 	gcode: string
 	setGcode: any
 }
@@ -72,4 +80,12 @@ export enum JobSocketStates {
 export interface BamStats {
 	activeJobs: number
 	activeMachines: number
+}
+
+export enum MachineTypes {
+	UM3E = "UM3E",
+	UMS3 = "UMS3",
+	PRUSA = "PRUSA",
+	DUMMY = "DUMMY",
+	NULL = "NULL",
 }

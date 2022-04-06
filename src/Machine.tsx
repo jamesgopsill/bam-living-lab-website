@@ -1,6 +1,6 @@
 import { Divider } from "antd"
 import React, { FC, Fragment, useState } from "react"
-import { MachineStates, MachineTabProps } from "./interfaces"
+import { MachineStates, MachineTabProps, MachineTypes } from "./interfaces"
 import { MachineAgent } from "./MachineAgent"
 import { DummyMachine } from "./machines/DummyMachine"
 import { Prusa } from "./machines/Prusa"
@@ -11,6 +11,9 @@ export const Machine: FC<MachineTabProps> = (props) => {
 		MachineStates.DISCONNECTED
 	)
 	const [gcode, setGcode] = useState<string>("")
+	const [machineType, setMachineType] = useState<MachineTypes>(
+		MachineTypes.NULL
+	)
 
 	const machine = () => {
 		if (props.type == "dummy") {
@@ -20,6 +23,8 @@ export const Machine: FC<MachineTabProps> = (props) => {
 					setMachineState={setMachineState}
 					gcode={gcode}
 					setGcode={setGcode}
+					machineType={machineType}
+					setMachineType={setMachineType}
 				/>
 			)
 		}
@@ -30,6 +35,8 @@ export const Machine: FC<MachineTabProps> = (props) => {
 					setMachineState={setMachineState}
 					gcode={gcode}
 					setGcode={setGcode}
+					machineType={machineType}
+					setMachineType={setMachineType}
 				/>
 			)
 		}
@@ -40,6 +47,8 @@ export const Machine: FC<MachineTabProps> = (props) => {
 					setMachineState={setMachineState}
 					gcode={gcode}
 					setGcode={setGcode}
+					machineType={machineType}
+					setMachineType={setMachineType}
 				/>
 			)
 		}
@@ -54,6 +63,7 @@ export const Machine: FC<MachineTabProps> = (props) => {
 				machineState={machineState}
 				gcode={gcode}
 				setGcode={setGcode}
+				machineType={machineType}
 			/>
 		</Fragment>
 	)

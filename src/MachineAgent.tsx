@@ -68,7 +68,9 @@ export const MachineAgent: FC<MachineAgentProps> = (props) => {
 				fromId: socket.id,
 				toId: "",
 				subject: MessageSubject.MACHINE_IS_LOOKING_FOR_JOBS,
-				body: {},
+				body: {
+					machineType: props.machineType,
+				},
 			}
 			socket.emit(MessageProtocols.ALL_JOBS, msg)
 			setTimeout(() => {
@@ -85,7 +87,9 @@ export const MachineAgent: FC<MachineAgentProps> = (props) => {
 				fromId: socket.id,
 				toId: job.fromId,
 				subject: MessageSubject.MACHINE_HAS_CHOSEN_A_JOB,
-				body: {},
+				body: {
+					machineType: props.machineType,
+				},
 			}
 			socket.emit(MessageProtocols.DIRECT, msg)
 		}

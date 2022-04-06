@@ -2,6 +2,7 @@ import { Button, Descriptions, notification, Space, Tag } from "antd"
 import React, { FC, Fragment, useEffect, useState } from "react"
 import { MachineProps, MachineStates } from "../interfaces"
 import { useInterval } from "../utils/use-interval"
+import { MachineTypeComponent } from "./MachineTypeComponent"
 
 export const DummyMachine: FC<MachineProps> = (props) => {
 	const [countDown, setCountDown] = useState<number>(0)
@@ -47,6 +48,10 @@ export const DummyMachine: FC<MachineProps> = (props) => {
 				</Descriptions.Item>
 			</Descriptions>
 			<Space>
+				<MachineTypeComponent
+					machineType={props.machineType}
+					setMachineType={props.setMachineType}
+				/>
 				<Button onClick={() => props.setMachineState(MachineStates.AVAILABLE)}>
 					Set Machine to Available
 				</Button>

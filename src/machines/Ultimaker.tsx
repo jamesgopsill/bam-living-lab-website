@@ -14,6 +14,7 @@ import {
 import React, { FC, Fragment, useEffect, useState } from "react"
 import { MachineProps, MachineStates } from "../interfaces"
 import { useInterval } from "../utils/use-interval"
+import { MachineTypeComponent } from "./MachineTypeComponent"
 
 export const Ultimaker: FC<MachineProps> = (props) => {
 	const [ip, setIp] = useState<string>("")
@@ -108,6 +109,10 @@ export const Ultimaker: FC<MachineProps> = (props) => {
 				</Descriptions.Item>
 			</Descriptions>
 			<Space>
+				<MachineTypeComponent
+					machineType={props.machineType}
+					setMachineType={props.setMachineType}
+				/>
 				<Input
 					placeholder="IP Address"
 					value={ip}
